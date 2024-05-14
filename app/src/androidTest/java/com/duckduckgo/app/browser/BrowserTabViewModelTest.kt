@@ -44,6 +44,7 @@ import com.duckduckgo.adclick.api.AdClickManager
 import com.duckduckgo.app.ValueCaptorObserver
 import com.duckduckgo.app.accessibility.data.AccessibilitySettingsDataStore
 import com.duckduckgo.app.accessibility.data.AccessibilitySettingsSharedPreferences
+import com.duckduckgo.app.autocomplete.api.AutoComplete
 import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteResult
 import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteSuggestion.AutoCompleteBookmarkSuggestion
 import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteSuggestion.AutoCompleteHistoryRelatedSuggestion.AutoCompleteHistorySearchSuggestion
@@ -51,6 +52,7 @@ import com.duckduckgo.app.autocomplete.api.AutoComplete.AutoCompleteSuggestion.A
 import com.duckduckgo.app.autocomplete.api.AutoCompleteApi
 import com.duckduckgo.app.autocomplete.api.AutoCompleteScorer
 import com.duckduckgo.app.autocomplete.api.AutoCompleteService
+import com.duckduckgo.app.autocomplete.impl.AutoCompleteRepository
 import com.duckduckgo.app.browser.LongPressHandler.RequiredAction
 import com.duckduckgo.app.browser.LongPressHandler.RequiredAction.DownloadFile
 import com.duckduckgo.app.browser.LongPressHandler.RequiredAction.OpenInNewTab
@@ -168,6 +170,7 @@ import com.duckduckgo.downloads.api.FileDownloader
 import com.duckduckgo.downloads.api.FileDownloader.PendingFileDownload
 import com.duckduckgo.feature.toggles.api.FeatureToggle
 import com.duckduckgo.feature.toggles.api.Toggle
+import com.duckduckgo.history.api.HistoryEntry.VisitedPage
 import com.duckduckgo.history.api.NavigationHistory
 import com.duckduckgo.privacy.config.api.*
 import com.duckduckgo.privacy.config.impl.features.gpc.RealGpc
@@ -197,10 +200,12 @@ import com.duckduckgo.voice.api.VoiceSearchAvailability
 import com.duckduckgo.voice.api.VoiceSearchAvailabilityPixelLogger
 import dagger.Lazy
 import io.reactivex.Observable
+import io.reactivex.Single
 import java.io.File
 import java.math.BigInteger
 import java.security.cert.X509Certificate
 import java.security.interfaces.RSAPublicKey
+import java.time.LocalDateTime
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
@@ -393,7 +398,7 @@ class BrowserTabViewModelTest {
 
     private val lazyFaviconManager = Lazy { mockFaviconManager }
 
-    private lateinit var mockAutoCompleteApi: AutoCompleteApi
+    private lateinit var mockAutoCompleteApi: AutoComplete
 
     private lateinit var ctaViewModel: CtaViewModel
 
@@ -470,6 +475,8 @@ class BrowserTabViewModelTest {
     private val mockBypassedSSLCertificatesRepository: BypassedSSLCertificatesRepository = mock()
     private val mockExtendedOnboardingExperimentVariantManager: ExtendedOnboardingExperimentVariantManager = mock()
     private val mockUserBrowserProperties: UserBrowserProperties = mock()
+    private val mockAutoCompleteRepository: AutoCompleteRepository = mock()
+    private val mockUserStorageStore: UserStageStore = mock()
 
     @Before
     fun before() {
@@ -480,7 +487,14 @@ class BrowserTabViewModelTest {
         fireproofWebsiteDao = db.fireproofWebsiteDao()
         locationPermissionsDao = db.locationPermissionsDao()
 
-        mockAutoCompleteApi = AutoCompleteApi(mockAutoCompleteService, mockSavedSitesRepository, mockNavigationHistory, mockAutoCompleteScorer)
+        mockAutoCompleteApi = AutoCompleteApi(
+            mockAutoCompleteService,
+            mockSavedSitesRepository,
+            mockNavigationHistory,
+            mockAutoCompleteScorer,
+            mockAutoCompleteRepository,
+            mockUserStageStore,
+        )
         val fireproofWebsiteRepositoryImpl = FireproofWebsiteRepositoryImpl(
             fireproofWebsiteDao,
             coroutineRule.testDispatcherProvider,
@@ -1411,6 +1425,42 @@ class BrowserTabViewModelTest {
         doReturn(false).whenever(mockSettingsStore).autoCompleteSuggestionsEnabled
         testee.onOmnibarInputStateChanged("", true, hasQueryChanged = true)
         assertFalse(autoCompleteViewState().showSuggestions)
+    }
+
+    @Test
+    fun wheneverAutoCompleteIsGoneAndHistoryIAMHasBeenShownThenNotifyUserSeenIAM() {
+        whenever(mockAutoCompleteService.autoComplete("foo")).thenReturn(Observable.just(emptyList()))
+        whenever(mockSavedSitesRepository.getBookmarksObservable()).thenReturn(
+            Single.just(listOf(Bookmark("abc", "title", "https://example.com", lastModified = null))),
+        )
+        whenever(mockSavedSitesRepository.getFavoritesObservable()).thenReturn(
+            Single.just(listOf(Favorite("abc", "title", "https://example.com", position = 1, lastModified = null))),
+        )
+        whenever(mockNavigationHistory.getHistorySingle()).thenReturn(
+            Single.just(listOf(VisitedPage("https://foo.com".toUri(), "title", listOf(LocalDateTime.now())))),
+        )
+        doReturn(true).whenever(mockSettingsStore).autoCompleteSuggestionsEnabled
+        testee.triggerAutocomplete("foo", true, hasQueryChanged = true)
+        testee.autoCompletePublishSubject.accept("query")
+        testee.autoCompleteSuggestionsGone()
+        verify(mockAutoCompleteRepository).submitUserSeenHistoryIAM()
+    }
+
+    @Test
+    fun wheneverAutoCompleteIsGoneAndHistoryIAMHaNotBeenShownThenDoNotNotifyUserSeenIAM() {
+        whenever(mockAutoCompleteService.autoComplete("foo")).thenReturn(Observable.just(emptyList()))
+        whenever(mockSavedSitesRepository.getBookmarksObservable()).thenReturn(
+            Single.just(listOf(Bookmark("abc", "title", "https://example.com", lastModified = null))),
+        )
+        whenever(mockSavedSitesRepository.getFavoritesObservable()).thenReturn(
+            Single.just(listOf(Favorite("abc", "title", "https://example.com", position = 1, lastModified = null))),
+        )
+        whenever(mockNavigationHistory.getHistorySingle()).thenReturn(Single.just(listOf()))
+        doReturn(true).whenever(mockSettingsStore).autoCompleteSuggestionsEnabled
+        testee.triggerAutocomplete("foo", true, hasQueryChanged = true)
+        testee.autoCompletePublishSubject.accept("query")
+        testee.autoCompleteSuggestionsGone()
+        verify(mockAutoCompleteRepository, never()).submitUserSeenHistoryIAM()
     }
 
     @Test
