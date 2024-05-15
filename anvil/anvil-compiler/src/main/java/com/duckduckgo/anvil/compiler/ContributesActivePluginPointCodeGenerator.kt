@@ -52,7 +52,26 @@ import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
 
-/** This Anvil code generator generates Active Plugins, ie. those that can be controlled via remote feature flag. */
+/**
+ * This Anvil code generator generates Active Plugins, ie. those that can be controlled via remote feature flag.
+ * Active plugins and Active plugin points are generated using the [ContributesActivePluginPoint] and [ContributesActivePlugin] annotations.
+ *
+ * For classes annotated with [ContributesActivePluginPoint], this generator will
+ * - generate a regular plugin point
+ * - generate a wrapper around the normal plugin point to handle the associated remote feature flag
+ * - generate a remote feature flag that will control the plugin point
+ * - generate the bindings so that users can depend on ActivePluginPoint<T>
+ *
+ * For classes annotated with [ContributesActivePlugin] this generator will:
+ * - generate a binding to contribute the plugin into the associated plugin point, using [ContributesMultibinding] and [PriorityKey]
+ * - generate a remote feature flag that will control the plugin
+ *
+ * The business logic generated will ensure that:
+ * - disabling a given remote feature flag associated to plugins will de-activate such plugin, ie. won't be return in getPlugins()
+ * - disabling the remote feature associated to the plugin point will make getPlugins() method to return empty list, regardless of whether the
+ * plugin is active or not
+ *
+ */
 @OptIn(ExperimentalAnvilApi::class)
 @AutoService(CodeGenerator::class)
 class ContributesActivePluginPointCodeGenerator : CodeGenerator {

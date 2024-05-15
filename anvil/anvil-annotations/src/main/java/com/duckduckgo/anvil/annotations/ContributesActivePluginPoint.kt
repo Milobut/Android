@@ -19,12 +19,14 @@ package com.duckduckgo.anvil.annotations
 import kotlin.reflect.KClass
 
 /**
- * Anvil annotation to generate plugin points
+ * Anvil annotation to generate plugin points that are guarded by a remote feature flag.
+ *
+ * Active plugins need to extend from [ActivePluginPoint.ActivePlugin]
  *
  * Usage:
  * ```kotlin
- * @ContributesPluginPoint(SomeDaggerScope::class)
- * interface MyPlugin {
+ * @ContributesActivePluginPoint(SomeDaggerScope::class)
+ * interface MyPlugin : ActivePluginPoint.ActivePlugin {
  *
  * }
  * ```
@@ -41,11 +43,13 @@ annotation class ContributesActivePluginPoint(
      *
      * usage:
      * ```kotlin
-     * @ContributesPluginPoint(
+     * @ContributesActivePluginPoint(
      *   scope = AppScope::class,
      *   boundType: MyPlugin::class
      * )
-     * interface MyPluginImpl : MyPlugin
+     * interface MyPluginPoint : MyPlugin
+     *
+     * interface MyPlugin : ActivePluginPoint.ActivePlugin {...}
      * ```
      */
     val boundType: KClass<*> = Unit::class,

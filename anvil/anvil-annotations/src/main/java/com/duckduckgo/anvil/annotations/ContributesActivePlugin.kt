@@ -19,7 +19,10 @@ package com.duckduckgo.anvil.annotations
 import kotlin.reflect.KClass
 
 /**
- * Anvil annotation to generate plugin points
+ * Anvil annotation to contribute plugins into an Active Plugin Point.
+ * Active plugins are also guarded by remote feature flags
+ *
+ * This annotation is the counterpart of [ContributesActivePluginPoint]
  *
  * Usage:
  * ```kotlin
@@ -37,17 +40,24 @@ annotation class ContributesActivePlugin(
     /** The scope in which to include this contributed PluginPoint */
     val scope: KClass<*>,
 
+    /**
+     * This is the type of the plugin the annotated class is extending from
+     * This is a required member to help the code generation.
+     */
     val boundType: KClass<*>,
 
     /**
-     * The default value of the [featureName] feature flag.
-     * By default they act as a kill-switch, ie. default enabled.
+     * The default value of remote feature flag.
+     * Default is true (ie. enabled)
      */
     val defaultActiveValue: Boolean = true,
 
     /**
      * The priority for the plugin.
      * Lower priority values mean the associated plugin comes first in the list of plugins.
+     *
+     * This is equivalent to the [PriorityKey] annotation we use with [ContributesMultibinding] for normal plugins.
+     * The [ContributesActivePlugin] coalesce both
      */
     val priority: Int = 0,
 )
