@@ -31,7 +31,6 @@ import logcat.logcat
 
 @ContributesActivePluginPoint(
     scope = AppScope::class,
-    featureName = "myPluginPoint",
 )
 interface MyPlugin : ActivePluginPoint.ActivePlugin {
     fun doSomething()
@@ -39,8 +38,8 @@ interface MyPlugin : ActivePluginPoint.ActivePlugin {
 
 @ContributesActivePlugin(
     scope = AppScope::class,
-    featureName = "fooActivePlugin",
     boundType = MyPlugin::class,
+    defaultActiveValue = false,
 )
 class FooActivePlugin @Inject constructor() : MyPlugin {
     override fun doSomething() {
@@ -50,7 +49,6 @@ class FooActivePlugin @Inject constructor() : MyPlugin {
 
 @ContributesActivePlugin(
     scope = AppScope::class,
-    featureName = "barActivePlugin",
     boundType = MyPlugin::class,
     priority = 100,
 )
@@ -62,7 +60,6 @@ class BarActivePlugin @Inject constructor() : MyPlugin {
 
 @ContributesActivePlugin(
     scope = AppScope::class,
-    featureName = "bazActivePlugin",
     boundType = MyPlugin::class,
     priority = 50,
 )

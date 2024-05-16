@@ -62,9 +62,6 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
         ContributesActivePluginPoint::class,
     )
 
-    private val pluginFeatures: MutableMap<String, ClassReference.Psi> = mutableMapOf()
-    private val pluginPointFeatures: MutableMap<ClassReference.Psi, String> = mutableMapOf()
-
     override fun isApplicable(context: AnvilContext): Boolean = true
 
     override fun generateCode(codeGenDir: File, module: ModuleDescriptor, projectFiles: Collection<KtFile>): Collection<GeneratedFileWithSources> {
@@ -72,7 +69,6 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
             .toList()
             .filter { reference -> reference.isAnnotatedWith(activePluginPointAnnotations.map { it.fqName }) }
             .flatMap {
-                annotateFeature(it)
                 listOf(
                     generateActivePluginsPointAndPlugins(it, codeGenDir, module),
                 )
@@ -99,9 +95,7 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
         val pluginPointRemoteFeatureClassName = "${vmClass.shortName}_ActivePluginPoint_RemoteFeature"
         val scope = vmClass.annotations.firstOrNull { it.fqName == ContributesActivePluginPoint::class.fqName }?.scopeOrNull(0)!!
         val pluginClassType = vmClass.pluginClassName(ContributesActivePluginPoint::class.fqName) ?: vmClass.asClassName()
-        val featureName = vmClass.annotations.firstOrNull {
-            it.fqName == ContributesActivePluginPoint::class.fqName
-        }?.featureNameOrNull(2)!!
+        val featureName = "pluginPoint${vmClass.shortName}"
 
         val content = FileSpec.buildFile(generatedPackage, pluginPointClassFileName) {
             // This is the normal plugin point
@@ -111,7 +105,7 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
                     .addAnnotation(
                         AnnotationSpec.builder(ContributesPluginPoint::class)
                             .addMember("scope = %T::class", scope.asClassName())
-                            .addMember("boundType = %T::class", vmClass.asClassName())
+                            .addMember("boundType = %T::class", pluginClassType)
                             .build(),
                     )
                     .addAnnotation(
@@ -265,9 +259,9 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
         val featureDefaultValue = vmClass.annotations.firstOrNull {
             it.fqName == ContributesActivePlugin::class.fqName
         }?.defaultActiveValueOrNull() ?: true
-        val featureName = vmClass.annotations.firstOrNull {
-            it.fqName == ContributesActivePlugin::class.fqName
-        }?.featureNameOrNull(2)!!
+        // the parent feature name is taken from the plugin interface name implemented by this class
+        val parentFeatureName = "pluginPoint${boundType.shortName}"
+        val featureName = "plugin${vmClass.shortName}"
         val generatedPackage = vmClass.packageFqName.toString()
         val pluginClassName = "${vmClass.shortName}_ActivePlugin"
         val pluginRemoteFeatureClassName = "${vmClass.shortName}_ActivePlugin_RemoteFeature"
@@ -322,7 +316,7 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
                         FunSpec.builder("isActive")
                             .addModifiers(OVERRIDE, SUSPEND)
                             .returns(Boolean::class)
-                            .addCode(CodeBlock.of("return toggle.self().isEnabled()"))
+                            .addCode(CodeBlock.of("return toggle.$featureName().isEnabled()"))
                             .build(),
                     )
                 }.build(),
@@ -334,11 +328,23 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
                     .addAnnotation(
                         AnnotationSpec.builder(ContributesRemoteFeature::class)
                             .addMember("scope = %T::class", scope.asClassName())
-                            .addMember("featureName = %S", featureName)
+                            .addMember("featureName = %S", parentFeatureName)
                             .build(),
                     )
                     .addFunction(
                         FunSpec.builder("self")
+                            .addModifiers(ABSTRACT)
+                            .addAnnotation(
+                                AnnotationSpec.builder(Toggle.DefaultValue::class)
+                                    // The parent feature toggle is the one guarding the plugin point, for convention is default enabled.
+                                    .addMember("defaultValue = %L", true)
+                                    .build(),
+                            )
+                            .returns(Toggle::class)
+                            .build(),
+                    )
+                    .addFunction(
+                        FunSpec.builder(featureName)
                             .addModifiers(ABSTRACT)
                             .addAnnotation(
                                 AnnotationSpec.builder(Toggle.DefaultValue::class)
@@ -355,41 +361,6 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
         return createGeneratedFile(codeGenDir, generatedPackage, pluginClassName, content, setOf(vmClass.containingFileAsJavaFile))
     }
 
-    private fun generatePluginPointRemoteFeature(codeGenDir: File, module: ModuleDescriptor): List<GeneratedFileWithSources> {
-        val generatedFiles: MutableList<GeneratedFileWithSources> = mutableListOf()
-
-        pluginPointFeatures.forEach { (ppClassName, ppFeatureName) ->
-            // get all associated plugins
-            val plugins = pluginFeatures.filter { it.value.asClassName().canonicalName == ppClassName.asClassName().canonicalName }
-            val generatedPackage = ppClassName.asClassName().packageName
-            val generatedRemoteFeatureClassName = "${ppClassName}_RemoteFeature"
-
-            if (plugins.isNotEmpty()) {
-                val content = FileSpec.buildFile(generatedPackage, generatedRemoteFeatureClassName) {}
-                val sourceFiles = plugins.map {
-                    it.value.containingFileAsJavaFile
-                }.toMutableSet().apply {
-                    add(ppClassName.containingFileAsJavaFile)
-                }
-
-                generatedFiles.add(
-                    createGeneratedFile(codeGenDir, generatedPackage, generatedRemoteFeatureClassName, content, sourceFiles),
-                )
-            }
-        }
-
-        return generatedFiles
-    }
-
-    private fun annotateFeature(vmClass: ClassReference.Psi) {
-        vmClass.annotations.firstOrNull { it.fqName == ContributesActivePlugin::class.fqName }?.featureNameOrNull(1)?.let { featureName ->
-            pluginFeatures.plus(featureName to vmClass)
-        }
-        vmClass.annotations.firstOrNull { it.fqName == ContributesActivePluginPoint::class.fqName }?.featureNameOrNull(2)?.let { featureName ->
-            pluginPointFeatures.plus(vmClass to featureName)
-        }
-    }
-
     private fun ClassReference.Psi.isContributesActivePlugin(): Boolean {
         return this.annotations.firstOrNull { it.fqName == ContributesActivePlugin::class.fqName } != null
     }
@@ -397,9 +368,6 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
     private fun ClassReference.Psi.isContributesActivePluginPoint(): Boolean {
         return this.annotations.firstOrNull { it.fqName == ContributesActivePluginPoint::class.fqName } != null
     }
-
-    @OptIn(ExperimentalAnvilApi::class)
-    private fun AnnotationReference.featureNameOrNull(parameterIndex: Int): String? = argumentAt("featureName", parameterIndex)?.value()
 
     @OptIn(ExperimentalAnvilApi::class)
     private fun AnnotationReference.defaultActiveValueOrNull(): Boolean? = argumentAt("defaultActiveValue", 2)?.value()

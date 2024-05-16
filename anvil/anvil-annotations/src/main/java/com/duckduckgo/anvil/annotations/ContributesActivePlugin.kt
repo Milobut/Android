@@ -40,11 +40,6 @@ annotation class ContributesActivePlugin(
     val boundType: KClass<*>,
 
     /**
-     * The name of the remote feature flag that will guard the active plugins
-     */
-    val featureName: String,
-
-    /**
      * The default value of the [featureName] feature flag.
      * By default they act as a kill-switch, ie. default enabled.
      */
