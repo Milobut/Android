@@ -14,20 +14,13 @@
  * limitations under the License.
  */
 
-package com.duckduckgo.networkprotection.impl.caca
+package com.duckduckgo.feature.toggles.codegen
 
-import androidx.lifecycle.LifecycleOwner
 import com.duckduckgo.anvil.annotations.ContributesActivePlugin
 import com.duckduckgo.anvil.annotations.ContributesActivePluginPoint
-import com.duckduckgo.app.di.AppCoroutineScope
-import com.duckduckgo.app.lifecycle.MainProcessLifecycleObserver
 import com.duckduckgo.common.utils.plugins.ActivePluginPoint
 import com.duckduckgo.di.scopes.AppScope
-import com.squareup.anvil.annotations.ContributesMultibinding
 import javax.inject.Inject
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import logcat.logcat
 
 @ContributesActivePluginPoint(
     scope = AppScope::class,
@@ -36,6 +29,16 @@ interface MyPlugin : ActivePluginPoint.ActivePlugin {
     fun doSomething()
 }
 
+interface TriggeredMyPlugin : ActivePluginPoint.ActivePlugin {
+    fun doSomething()
+}
+@ContributesActivePluginPoint(
+    scope = AppScope::class,
+    boundType = TriggeredMyPlugin::class,
+)
+private interface TriggeredMyPluginTrigger
+
+
 @ContributesActivePlugin(
     scope = AppScope::class,
     boundType = MyPlugin::class,
@@ -43,7 +46,6 @@ interface MyPlugin : ActivePluginPoint.ActivePlugin {
 )
 class FooActivePlugin @Inject constructor() : MyPlugin {
     override fun doSomething() {
-        logcat { "Aitor Foo" }
     }
 }
 
@@ -54,7 +56,6 @@ class FooActivePlugin @Inject constructor() : MyPlugin {
 )
 class BarActivePlugin @Inject constructor() : MyPlugin {
     override fun doSomething() {
-        logcat { "Aitor Bar" }
     }
 }
 
@@ -65,27 +66,5 @@ class BarActivePlugin @Inject constructor() : MyPlugin {
 )
 class BazActivePlugin @Inject constructor() : MyPlugin {
     override fun doSomething() {
-        logcat { "Aitor Baz" }
-    }
-}
-
-// ////
-// @ContributesPluginPoint(
-//     scope = AppScope::class,
-//     boundType = MyPlugin::class,
-// )
-// @Suppress("unused")
-// private interface TriggerMyPluginGenerationPP
-
-@ContributesMultibinding(AppScope::class)
-class UserOfThePluginPoint @Inject constructor(
-    private val pp: ActivePluginPoint<@JvmSuppressWildcards MyPlugin>,
-    @AppCoroutineScope private val coroutineScope: CoroutineScope,
-) : MainProcessLifecycleObserver {
-
-    override fun onResume(owner: LifecycleOwner) {
-        coroutineScope.launch {
-            pp.getPlugins().forEach { it.doSomething() }
-        }
     }
 }
