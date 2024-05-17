@@ -32,12 +32,12 @@ interface MyPlugin : ActivePluginPoint.ActivePlugin {
 interface TriggeredMyPlugin : ActivePluginPoint.ActivePlugin {
     fun doSomething()
 }
+
 @ContributesActivePluginPoint(
     scope = AppScope::class,
     boundType = TriggeredMyPlugin::class,
 )
 private interface TriggeredMyPluginTrigger
-
 
 @ContributesActivePlugin(
     scope = AppScope::class,

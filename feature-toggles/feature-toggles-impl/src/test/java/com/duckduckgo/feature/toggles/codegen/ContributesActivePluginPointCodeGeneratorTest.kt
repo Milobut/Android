@@ -120,7 +120,6 @@ class ContributesActivePluginPointCodeGeneratorTest {
         assertEquals("pluginPointMyPlugin", featureAnnotation.featureName)
     }
 
-
     @Test
     fun `test generated triggered plugin point`() {
         val clazz = Class
@@ -130,7 +129,6 @@ class ContributesActivePluginPointCodeGeneratorTest {
         assertEquals(AppScope::class, featureAnnotation.scope)
         assertEquals(TriggeredMyPlugin::class, featureAnnotation.boundType)
     }
-
 
     @Test
     fun `test generated triggered plugin point remote feature`() {
