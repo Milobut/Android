@@ -97,7 +97,11 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
             }.toList()
     }
 
-    private fun generateActivePluginsPointAndPlugins(vmClass: ClassReference.Psi, codeGenDir: File, module: ModuleDescriptor): GeneratedFileWithSources {
+    private fun generateActivePluginsPointAndPlugins(
+        vmClass: ClassReference.Psi,
+        codeGenDir: File,
+        module: ModuleDescriptor,
+    ): GeneratedFileWithSources {
         return if (vmClass.isContributesActivePluginPoint()) {
             generatedActivePluginPoint(vmClass, codeGenDir, module)
         } else {
