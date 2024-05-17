@@ -114,7 +114,7 @@ class ContributesActivePluginPointCodeGenerator : CodeGenerator {
         val pluginPointRemoteFeatureClassName = "${vmClass.shortName}_ActivePluginPoint_RemoteFeature"
         val scope = vmClass.annotations.firstOrNull { it.fqName == ContributesActivePluginPoint::class.fqName }?.scopeOrNull(0)!!
         val pluginClassType = vmClass.pluginClassName(ContributesActivePluginPoint::class.fqName) ?: vmClass.asClassName()
-        val featureName = "pluginPoint${vmClass.shortName}"
+        val featureName = "pluginPoint${pluginClassType.simpleName}"
 
         val content = FileSpec.buildFile(generatedPackage, pluginPointClassFileName) {
             // This is the normal plugin point

@@ -132,6 +132,47 @@ class ContributesActivePluginPointCodeGeneratorTest {
     }
 
 
+    @Test
+    fun `test generated triggered plugin point remote feature`() {
+        val clazz = Class
+            .forName("com.duckduckgo.feature.toggles.codegen.TriggeredMyPluginTrigger_ActivePluginPoint_RemoteFeature")
+
+        assertNotNull(clazz.methods.find { it.name == "self" && it.returnType.kotlin == Toggle::class })
+
+        assertNotNull(
+            clazz.kotlin.functions.firstOrNull { it.name == "self" }!!.annotations.firstOrNull { it.annotationClass == Toggle.DefaultValue::class },
+        )
+        assertTrue(clazz.kotlin.java.methods.find { it.name == "self" }!!.getAnnotation(Toggle.DefaultValue::class.java)!!.defaultValue)
+
+        val featureAnnotation = clazz.kotlin.java.getAnnotation(ContributesRemoteFeature::class.java)!!
+        assertEquals(AppScope::class, featureAnnotation.scope)
+        assertEquals("pluginPointTriggeredMyPlugin", featureAnnotation.featureName)
+    }
+
+    @Test
+    fun `test generated triggered foo remote features`() {
+        val clazz = Class
+            .forName("com.duckduckgo.feature.toggles.codegen.FooActiveTriggeredMyPlugin_ActivePlugin_RemoteFeature")
+
+        assertNotNull(clazz.methods.find { it.name == "self" && it.returnType.kotlin == Toggle::class })
+        assertNotNull(clazz.methods.find { it.name == "pluginFooActiveTriggeredMyPlugin" && it.returnType.kotlin == Toggle::class })
+
+        assertNotNull(
+            clazz.kotlin.functions.firstOrNull { it.name == "self" }!!.annotations.firstOrNull { it.annotationClass == Toggle.DefaultValue::class },
+        )
+        assertNotNull(
+            clazz.kotlin.functions.firstOrNull { it.name == "pluginFooActiveTriggeredMyPlugin" }!!.annotations.firstOrNull { it.annotationClass == Toggle.DefaultValue::class },
+        )
+        assertTrue(clazz.kotlin.java.methods.find { it.name == "self" }!!.getAnnotation(Toggle.DefaultValue::class.java)!!.defaultValue)
+        assertFalse(
+            clazz.kotlin.java.methods.find { it.name == "pluginFooActiveTriggeredMyPlugin" }!!.getAnnotation(Toggle.DefaultValue::class.java)!!.defaultValue,
+        )
+
+        val featureAnnotation = clazz.kotlin.java.getAnnotation(ContributesRemoteFeature::class.java)!!
+        assertEquals(AppScope::class, featureAnnotation.scope)
+        assertEquals("pluginPointTriggeredMyPlugin", featureAnnotation.featureName)
+    }
+
     private infix fun KClass<*>.extends(other: KClass<*>): Boolean =
         other.java.isAssignableFrom(this.java)
 }

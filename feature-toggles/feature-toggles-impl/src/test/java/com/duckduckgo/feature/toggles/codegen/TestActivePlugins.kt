@@ -41,6 +41,16 @@ private interface TriggeredMyPluginTrigger
 
 @ContributesActivePlugin(
     scope = AppScope::class,
+    boundType = TriggeredMyPlugin::class,
+    defaultActiveValue = false,
+)
+class FooActiveTriggeredMyPlugin @Inject constructor() : TriggeredMyPlugin {
+    override fun doSomething() {
+    }
+}
+
+@ContributesActivePlugin(
+    scope = AppScope::class,
     boundType = MyPlugin::class,
     defaultActiveValue = false,
 )
